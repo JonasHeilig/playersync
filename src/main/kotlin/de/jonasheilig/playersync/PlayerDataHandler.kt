@@ -53,4 +53,35 @@ class PlayerDataHandler : Listener {
         }
     }
 
+    @EventHandler
+    fun onPlayerQuit(event: PlayerQuitEvent) {
+        val player = event.player
+        val uuid = player.uniqueId.toString()
+
+        Bukkit.getScheduler().runTaskAsynchronously(Playersync.instance) {
+            val outputStream = ByteArrayOutputStream()
+            val dataOutput = BukkitObjectOutputStream(outputStream)
+
+            val inventory = player.inventory.contents
+            dataOutput.writeInt(inventory.size)
+            for (item in inventory) {
+                dataOutput.writeObject(item)
+            }
+
+            dataOutput.close()
+            outputStream.close()
+
+            val inventoryData = Base64.getEncoder().encodeToString(outputStream.toByteArray())
+            val xp = player.totalExperience
+
+            val statement: PreparedStatement = Database.connection.prepareStatement(
+                "REPLACE INTO player_data (uuid, inventory, xp) VALUES (?, ?, ?)"
+            )
+            statement.setString(1, uuid)
+            statement.setString(2, inventoryData)
+            statement.setInt(3, xp)
+            statement.executeUpdate()
+            statement.close()
+        }
+    }
 }
